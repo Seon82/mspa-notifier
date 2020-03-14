@@ -6,4 +6,4 @@ In the long run, I want it to become a full-fledged customizable notifier, with 
 The code requires `python 3`.
 
 ## Installation
-Pull or download the repository. Then run `pip3 -r install requirements.txt` from the and you're good to go!
+Pull or download the repository. Then run `pip3 -r install requirements.txt` and you're good to go!

@@ -26,4 +26,4 @@ def isSavingPower():
         return False
     plugged = battery.power_plugged
     percent = str(battery.percent)
-    return plugged or int(percent)<=20
+    return (not plugged) or int(percent)<=20

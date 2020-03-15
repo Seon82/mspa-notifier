@@ -134,8 +134,8 @@ class Feed():
     def getUpdateFreq(self):
         ''' Returns the update frequency of the feed. Beware, does not check whether the feed is active.'''
         if isSavingPower():
-            return self.psUpdateFreq*6000 # to milliseconds
-        return self.updateFreq*6000 # to milliseconds
+            return self.psUpdateFreq*60000 # to milliseconds
+        return self.updateFreq*60000 # to milliseconds
 
     def generateNotification(self):
         '''Returns a notification made with a random image'''
@@ -143,16 +143,16 @@ class Feed():
         imagePath = os.path.join(self.imageFolder, imageFile)
         return Notification(self.name, self.notifier, imagePath, self.latestLink, self.sound)
 
-    def updateParams(active, updateFreq, psInactive, psUpdateFreq):
+    def updateParams(self, active, updateFreq, psInactive, psUpdateFreq):
         '''Used to update the feed's parameters. Resets the feed's timer.'''
         self.active = active
         self.updateFreq = updateFreq
         self.psInactive = psInactive
         self.psUpdateFreq = psUpdateFreq
         if self.isActive():
-            timer.start(self.getUpdateFreq())
+            self.timer.start(self.getUpdateFreq())
         else:
-            timer.stop()
+            self.timer.stop()
         self.save()
 
     def save(self):
@@ -169,10 +169,15 @@ class Feed():
 class RSSFeed(Feed):
     def fetchUpdate(self):
         link = getLatestRSS(self.link)
-        if link!=self.latestLink:
-            self.latestLink = link
-            self.save()
-            self.notifier.push(self.generateNotification())
+        for _ in range(2):
+            try:
+                if link!=self.latestLink:
+                    self.latestLink = link
+                    self.save()
+                    self.notifier.push(self.generateNotification())
+            except:
+                print("Couldn't connect to website")
+                pass
 
 class WebsiteFeed(Feed):
     def __init__(self, xpath, *args, **kwargs):
@@ -180,12 +185,16 @@ class WebsiteFeed(Feed):
         self.xpath = xpath
 
     def fetchUpdate(self):
-        link = getLatestLink(self.link, self.xpath)
-        if link!=self.latestLink:
-            self.latestLink = link
-            self.save()
-            self.notifier.push(self.generateNotification())
-
+        for _ in range(2):
+            try:
+                link = getLatestLink(self.link, self.xpath)
+                if link!=self.latestLink:
+                    self.latestLink = link
+                    self.save()
+                    self.notifier.push(self.generateNotification())
+            except:
+                print("Couldn't connect to website")
+                pass
 
 class SettingsWindow(QMainWindow):
     def __init__(self, tray, *args, **kwargs):
@@ -193,7 +202,7 @@ class SettingsWindow(QMainWindow):
         self.tray = tray
         self.volume = self.tray.notifier.volume * 100
         self.setWindowTitle("Settings")
-        self.setWindowIcon(QIcon('settings.png'))
+        self.setWindowIcon(QIcon('media/icons/settings.png'))
         self.sections = []
 
         widget = QWidget()
@@ -311,11 +320,11 @@ class TrayApp(QSystemTrayIcon):
         self.feeds = []
         volume = self.loadVolume()
         self.notifier = Notifier(volume/100)
-        self.loadFeeds("data/feeds")
+        self.loadFeeds("data/feeds/")
         self.settingsWindow = SettingsWindow(self)
 
         # Create the icon
-        icon = QIcon("icon.png")
+        icon = QIcon("media/icons/icon.png")
         self.setIcon(icon)
         self.setVisible(True)
 
@@ -337,7 +346,7 @@ class TrayApp(QSystemTrayIcon):
         '''Forces all active feeds to check for updates'''
         for feed in self.feeds:
             if feed.isActive():
-                self.feed.fetchUpdated()
+                feed.fetchUpdate()
 
     def openSettingsWindow(self):
         self.settingsWindow.show()
@@ -347,23 +356,26 @@ class TrayApp(QSystemTrayIcon):
 
     def loadFeeds(self, path):
         for file in os.listdir(path):
+            file = os.path.join(path, file)
             with open(file, 'rb') as f:
                 feed = pickle.load(f)
             feed.reset(self.notifier)
             self.addFeed(feed)
 
     def createRssFeed(self, *args, **kwargs):
-        feed = RSSFeed(*args, **kwargs)
+        notifier = self.notifier
+        feed = RSSFeed(notifier = notifier, *args, **kwargs)
         self.addFeed(feed)
 
     def createWebsiteFeed(self, *args, **kwargs):
-        feed = WebsiteFeed(*args, **kwargs)
+        notifier = self.notifier
+        feed = WebsiteFeed(notifier = notifier, *args, **kwargs)
         self.addFeed(feed)
 
     def updateVolume(self, volume):
         self.notifier.volume = volume
         with open("data/volume", "w") as f:
-            f.write(str(volume))
+            f.write(str(int(volume)))
 
     def loadVolume(self):
         with open("data/volume", "r") as f:

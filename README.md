@@ -6,7 +6,7 @@ The code requires `python 3`.
 Tested on Windows 10.
 
 ## Installation
-Pull or download the repository. Then run `pip3 -r install requirements.txt` and you're good to go!\
+Pull or download the repository. Then run `pip3 install -r requirements.txt` and you're good to go!\
 Run `gui.py`and the app logo should show up in your taskbar.
 
 ## Known bugs

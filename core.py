@@ -15,9 +15,6 @@ def getLatestLink(link, xpath):
     latest_link = tree.xpath(xpath)[0]
     return latest_link
 
-# https://www.deconreconstruction.com/
-# (//a[@class='project__link']//@href)[1]
-
 
 def isSavingPower():
     '''Returns True iif thelaptop is unplugged and the battery below 20%'''

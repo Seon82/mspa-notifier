@@ -8,20 +8,9 @@ import os
 from random import choice as randchoice
 from core import *
 
-
-'''
-TODO :
-- test current code [DONE]
-- implement RSS & website parser in core.py [DONE]
-- add volume control [DONE]
-- add volume persistence [DONE]
-- add saving and loading feeds -> 1 file per feed [DONE]
-- add animated .gif support [DONE]
-- run as service
-'''
-
 class Notifier():
-    ''' Manages the active notification and the notification queue'''
+    ''' Manages the active notification and the notification queue.
+    - volume is a float between 0 and 1 that manages the notification volume.'''
     def __init__(self, volume = 1):
         self.volume = volume
         self.activeNotification = None
@@ -42,7 +31,7 @@ class Notifier():
                 self.queue.append(notification)
 
     def update(self):
-        '''Call after killing the active notification.'''
+        '''Call after killing the active notification. Processes the queue.'''
         if self.queue == []:
             self.activeNotification = None
         else:
@@ -51,10 +40,14 @@ class Notifier():
 
 
 class Notification(QMainWindow):
-    '''Transparent window containing a notification. Use Notification.show to display.'''
+    '''Transparent window containing an image or animated gif, used to display notifications.'''
 
     def __init__(self, name, notifier, artPath, link, sound=None, *args, **kwargs):
-        '''Image and Sound should be paths to files. Set Sound to None for silent notifications'''
+        '''- name : a string
+        - notifier : a Notifier object used to manage this notification
+        - artPath : a string containing the path to the image file to be displayed
+        - link : a string containing the link to be opened when left-clicking the notification
+        - sound : a string containing the path to the object or None. Set to None for silent notifiations.'''
         super().__init__(*args, **kwargs)
         self.setCursor(QCursor(Qt.PointingHandCursor))
         self.name = name
@@ -82,10 +75,12 @@ class Notification(QMainWindow):
             self.moveToBottomRight(self.art.width(), self.art.height())
 
     def moveToBottomRight(self, x, y):
+        '''Moves the notification window to the bottom-right of the screen, above the taskbar'''
         screen =  QDesktopWidget().availableGeometry()
         x_pos = screen.width() - x
         y_pos = screen.height() - y
         self.move(x_pos, y_pos)
+
     def mousePressEvent(self, QMouseEvent):
         if QMouseEvent.button() == Qt.LeftButton:
             self.close()
@@ -94,7 +89,7 @@ class Notification(QMainWindow):
             self.close()
 
     def display(self, volume = 1):
-        '''Shows notification window and plays sound'''
+        '''Show the notification window and plays the sound.'''
         super().show()
         if self.isMovie:
             self.art.start()
@@ -103,12 +98,23 @@ class Notification(QMainWindow):
             self.sound.play()
 
     def close(self):
-        '''Updates notifier before closing'''
+        '''Updates notifier and closes window'''
         super().close()
         self.notifier.update()
 
 class Feed():
+    '''A generic feed object, used to track updates from a remote source'''
     def __init__(self, name, link, imageFolder, notifier, active = True, updateFreq = 5, psInactive = False, psUpdateFreq = 30, sound = None, latestLink = ''):
+        '''- name : a string
+        - link : a string containing the tracked remote source
+        - imageFolder : a string containing a path to the directory containing the art to be used for the notifications
+        - notifier : a Notifier object
+        - active : a bool, describing the feed is active (periodically monitoring remote source)
+        - updateFreq : a float, describing how often the remote source should be checked. Useless if active is set to False.
+        - psInactive : a bool, describing whether the feed should become inactive when the battery dips below 20%
+        - psUdpdateFreq : a float, describing how often the remote source should be checked when battery is under 20%. Useless if psInactive is set to True.
+        - sound : a string containing the path to the sound file to be played in notifications
+        - latestLink : a string, containing a link to the latest webpage given by the remote source'''
         self.name = name
         self.link = link
         self.imageFolder = imageFolder
@@ -121,6 +127,7 @@ class Feed():
         self.reset(notifier)
 
     def reset(self, notifier):
+        '''Adds the notifier and starts timer. Use when loading Feed from memory'''
         self.notifier = notifier
         self.timer = QTimer()
         self.timer.timeout.connect(self.fetchUpdate)
@@ -157,6 +164,8 @@ class Feed():
         self.save()
 
     def save(self):
+        '''Saves the feed to memory using pickle under ./data/feeds/self.name
+        The QTimer and Notifier object aren't saved and must be restored using self.reset(notifier) after loading'''
         timer = self.timer
         notifier = self.notifier
         self.timer = None
@@ -168,14 +177,17 @@ class Feed():
 
 
 class RSSFeed(Feed):
+    '''Inherits the Feed generic class. Use for an RSS feed source'''
     def fetchUpdate(self, force = False):
-        '''force = True pushes a notification to the notifier even if there was no update'''
+        '''Fetches update from the remote source.
+        Also saves the Feed and pushes the update to the notifier in case an update was found.
+        force = True pushes a notification to the notifier even if there was no update'''
         link = getLatestRSS(self.link)
         try:
             if link!=self.latestLink:
                 self.latestLink = link
-                self.save()
                 self.notifier.push(self.generateNotification())
+                self.save()
             elif force:
                 self.notifier.push(self.generateNotification())
         except:
@@ -183,18 +195,21 @@ class RSSFeed(Feed):
             pass
 
 class WebsiteFeed(Feed):
+    '''Inherits the Feed generic class. Use to monitor a link with a fixed xpath from any website'''
     def __init__(self, xpath, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.xpath = xpath
 
     def fetchUpdate(self, force = False):
-        '''force = True pushes a notification to the notifier even if there was no update'''
+        '''Fetches update from the remote source.
+        Also saves the Feed and pushes the update to the notifier in case an update was found.
+        force = True pushes a notification to the notifier even if there was no update'''
         try:
             link = getLatestLink(self.link, self.xpath)
             if link!=self.latestLink:
                 self.latestLink = link
-                self.save()
                 self.notifier.push(self.generateNotification())
+                self.save()
             elif force:
                 self.notifier.push(self.generateNotification())
         except:
@@ -202,6 +217,7 @@ class WebsiteFeed(Feed):
             pass
 
 class SettingsWindow(QMainWindow):
+    '''A window containing the settings for each feed, as well as global settings'''
     def __init__(self, tray, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.tray = tray
@@ -245,7 +261,9 @@ class SettingsWindow(QMainWindow):
         self.close()
 
 class SettingsSection(QGroupBox):
+    '''A widget containing the settings for an individual feed'''
     def __init__(self, feed, *args, **kwargs):
+        '''feed is a RSSFeed or a WebsiteFeed'''
         super().__init__(*args, **kwargs)
         self.feed = feed
         self.setTitle(self.feed.name)
@@ -320,6 +338,7 @@ class SettingsSection(QGroupBox):
             self.feed.updateParams(active, updateFreq, psInactive, psUpdateFreq)
 
 class TrayApp(QSystemTrayIcon):
+    '''The main tray window'''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.feeds = []
@@ -358,12 +377,16 @@ class TrayApp(QSystemTrayIcon):
                 feed.fetchUpdate()
 
     def openSettingsWindow(self):
+        '''Opens the settings window'''
         self.settingsWindow.show()
 
     def addFeed(self, feed):
+        '''Adds a feed to the self.feed attribute list.'''
         self.feeds.append(feed)
 
     def loadFeeds(self, path):
+        '''Loads the feeds in the directory indicated by path from memory.
+        path must contain nothing but memory file created by Feed.save'''
         for file in os.listdir(path):
             file = os.path.join(path, file)
             with open(file, 'rb') as f:
@@ -372,21 +395,25 @@ class TrayApp(QSystemTrayIcon):
             self.addFeed(feed)
 
     def createRssFeed(self, *args, **kwargs):
+        '''Creates a new RSSFeed and adds it to the app's feeds'''
         notifier = self.notifier
         feed = RSSFeed(notifier = notifier, *args, **kwargs)
         self.addFeed(feed)
 
     def createWebsiteFeed(self, *args, **kwargs):
+        '''Creates a new WebsiteFeed and adds it to the app's feeds'''
         notifier = self.notifier
         feed = WebsiteFeed(notifier = notifier, *args, **kwargs)
         self.addFeed(feed)
 
     def updateVolume(self, volume):
+        '''Updates the volume attribute of the notifier and saves the new volume to memory'''
         self.notifier.volume = volume
         with open("data/volume", "w") as f:
             f.write(str(int(volume)))
 
     def loadVolume(self):
+        '''Loads and returns the saved volume setting'''
         with open("data/volume", "r") as f:
             volume = int(f.read())
         return volume

@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QTimer, QUrl
-from PyQt5.QtGui import QPixmap, QMouseEvent, QIcon, QPalette, QMovie, QColor
+from PyQt5.QtGui import QPixmap, QMouseEvent, QIcon, QPalette, QMovie, QColor, QCursor
 from PyQt5.QtMultimedia import QSoundEffect
 import webbrowser
 import pickle
@@ -56,6 +56,7 @@ class Notification(QMainWindow):
     def __init__(self, name, notifier, artPath, link, sound=None, *args, **kwargs):
         '''Image and Sound should be paths to files. Set Sound to None for silent notifications'''
         super().__init__(*args, **kwargs)
+        self.setCursor(QCursor(Qt.PointingHandCursor))
         self.name = name
         self.notifier = notifier
         self.link = link
@@ -87,8 +88,8 @@ class Notification(QMainWindow):
         self.move(x_pos, y_pos)
     def mousePressEvent(self, QMouseEvent):
         if QMouseEvent.button() == Qt.LeftButton:
-            webbrowser.open_new_tab(self.link)
             self.close()
+            webbrowser.open_new_tab(self.link)
         elif QMouseEvent.button() == Qt.RightButton:
             self.close()
 
@@ -103,8 +104,8 @@ class Notification(QMainWindow):
 
     def close(self):
         '''Updates notifier before closing'''
-        self.notifier.update()
         super().close()
+        self.notifier.update()
 
 class Feed():
     def __init__(self, name, link, imageFolder, notifier, active = True, updateFreq = 5, psInactive = False, psUpdateFreq = 30, sound = None, latestLink = ''):
@@ -167,34 +168,38 @@ class Feed():
 
 
 class RSSFeed(Feed):
-    def fetchUpdate(self):
+    def fetchUpdate(self, force = False):
+        '''force = True pushes a notification to the notifier even if there was no update'''
         link = getLatestRSS(self.link)
-        for _ in range(2):
-            try:
-                if link!=self.latestLink:
-                    self.latestLink = link
-                    self.save()
-                    self.notifier.push(self.generateNotification())
-            except:
-                print("Couldn't connect to website")
-                pass
+        try:
+            if link!=self.latestLink:
+                self.latestLink = link
+                self.save()
+                self.notifier.push(self.generateNotification())
+            elif force:
+                self.notifier.push(self.generateNotification())
+        except:
+            print("Couldn't connect to website")
+            pass
 
 class WebsiteFeed(Feed):
     def __init__(self, xpath, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.xpath = xpath
 
-    def fetchUpdate(self):
-        for _ in range(2):
-            try:
-                link = getLatestLink(self.link, self.xpath)
-                if link!=self.latestLink:
-                    self.latestLink = link
-                    self.save()
-                    self.notifier.push(self.generateNotification())
-            except:
-                print("Couldn't connect to website")
-                pass
+    def fetchUpdate(self, force = False):
+        '''force = True pushes a notification to the notifier even if there was no update'''
+        try:
+            link = getLatestLink(self.link, self.xpath)
+            if link!=self.latestLink:
+                self.latestLink = link
+                self.save()
+                self.notifier.push(self.generateNotification())
+            elif force:
+                self.notifier.push(self.generateNotification())
+        except:
+            print("Couldn't connect to website")
+            pass
 
 class SettingsWindow(QMainWindow):
     def __init__(self, tray, *args, **kwargs):
@@ -334,6 +339,10 @@ class TrayApp(QSystemTrayIcon):
         menu = QMenu()
         updateAction = menu.addAction("Update NOW")
         updateAction.triggered.connect(self.updateAll)
+        fakeMenu = menu.addMenu("Fake update")
+        for feed in self.feeds:
+            forceUpdate = fakeMenu.addAction(feed.name)
+            forceUpdate.triggered.connect(lambda _, feed=feed:feed.fetchUpdate(force=True))
         settingsAction = menu.addAction("Settings")
         settingsAction.triggered.connect(self.openSettingsWindow)
         quitAction = menu.addAction("Quit")

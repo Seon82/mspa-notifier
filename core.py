@@ -12,7 +12,7 @@ def getLatestLink(link, xpath):
     page = requests.get(link)
     tree = html.fromstring(page.content)
     tree.make_links_absolute(link)
-    latest_link = tree.xpath(xpath)
+    latest_link = tree.xpath(xpath)[0]
     return latest_link
 
 # https://www.deconreconstruction.com/

@@ -9,6 +9,10 @@ Tested on Windows 10.
 Pull or download the repository. Then run `pip3 install -r requirements.txt` and you're good to go!\
 Run `gui.py`and the app logo should show up in your taskbar.
 
+#### How to make the code run at boot
+Press Win + R, type `shell:startup` and validate.\
+A directory opens, just put a shortcut to the gui.py file inside.
+
 ## Known bugs
 * All unopened notifications will be lost after shutdown.
 * Does not respect "Focus assist" mode in Windows 10.

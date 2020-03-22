@@ -151,12 +151,14 @@ class Feed():
         imagePath = os.path.join(self.imageFolder, imageFile)
         return Notification(self.name, self.notifier, imagePath, self.latestLink, self.sound)
 
-    def updateParams(self, active, updateFreq, psInactive, psUpdateFreq):
+    def updateParams(self, active, updateFreq, psInactive, psUpdateFreq, imageFolder, sound):
         '''Used to update the feed's parameters. Resets the feed's timer.'''
         self.active = active
         self.updateFreq = updateFreq
         self.psInactive = psInactive
         self.psUpdateFreq = psUpdateFreq
+        self.imageFolder = imageFolder
+        self.sound = sound
         if self.isActive():
             self.timer.start(self.getUpdateFreq())
         else:
@@ -182,8 +184,8 @@ class RSSFeed(Feed):
         '''Fetches update from the remote source.
         Also saves the Feed and pushes the update to the notifier in case an update was found.
         force = True pushes a notification to the notifier even if there was no update'''
-        link = getLatestRSS(self.link)
         try:
+            link = getLatestRSS(self.link)
             if link!=self.latestLink:
                 self.latestLink = link
                 self.notifier.push(self.generateNotification())
@@ -292,27 +294,57 @@ class SettingsSection(QGroupBox):
         psGroup.setPalette(palette)
         grid.addWidget(psGroup, 2,0,2,0)
         psGrid = QGridLayout(psGroup)
-        psGrid.addWidget(QLabel("Stop updating"),3,0)
+        psGrid.addWidget(QLabel("Stop updating"),0,0)
         self.psInactive = QCheckBox()
         self.psInactive.setChecked(self.feed.psInactive)
         self.psInactive.stateChanged.connect(self.updateDisplay)
-        psGrid.addWidget(self.psInactive, 3,1)
+        psGrid.addWidget(self.psInactive, 0,1)
         psTextUpdate = QLabel("Update every")
-        psGrid.addWidget(psTextUpdate,4,0)
+        psGrid.addWidget(psTextUpdate,1,0)
         self.psUpdateFreq = QDoubleSpinBox()
         self.psUpdateFreq.setDecimals(0)
         self.psUpdateFreq.setMinimum(1)
         self.psUpdateFreq.setValue(self.feed.psUpdateFreq)
-        psGrid.addWidget(self.psUpdateFreq, 4, 1)
+        psGrid.addWidget(self.psUpdateFreq, 1, 1)
         psMinutesText = QLabel("minutes")
-        psGrid.addWidget(psMinutesText, 4, 2)
+        psGrid.addWidget(psMinutesText, 1, 2)
 
+        # Add macro and sound file selection
+        macroSelection = QPushButton("Macro folder")
+        self.macroText = QLabel("..."+os.path.abspath(feed.imageFolder)[-15:])
+        self.macroText.setToolTip(os.path.abspath(feed.imageFolder))
+        macroSelection.clicked.connect(lambda _: self.selectMacroDir())
+        soundSelection = QPushButton("Notification sound")
+        self.soundText = QLabel("..."+os.path.abspath(feed.sound)[-15:])
+        self.soundText.setToolTip(os.path.abspath(feed.sound))
+        soundSelection.clicked.connect(lambda _: self.selectSoundFile())
+
+        grid.addWidget(macroSelection, 5,0)
+        grid.addWidget(self.macroText, 5,1)
+        grid.addWidget(soundSelection, 6,0)
+        grid.addWidget(self.soundText, 6,1)
         # Groups you can disable depending on checkbox values
         self.hideable = [psGroup, textUpdate, self.updateFreq, textMinutes]
         self.psHideable = [psTextUpdate, self.psUpdateFreq, psMinutesText]
 
         # Update
         self.updateDisplay()
+
+
+    def selectMacroDir(self):
+        dialog = QFileDialog()
+        name = dialog.getExistingDirectory(caption = "Choose macro directory", directory = "media", options = QFileDialog.ShowDirsOnly)
+        if name!='':
+            self.macroText.setText("..."+os.path.abspath(name)[-15:])
+            self.macroText.setToolTip(name)
+
+    def selectSoundFile(self):
+        dialog = QFileDialog()
+        name, _ = dialog.getOpenFileName(caption = "Choose notification sound", directory = "media", filter = "Sound files (*.wav)")
+        if name!='':
+            self.macroText.setText("..."+os.path.abspath(name)[-15:])
+            self.macroText.setToolTip(name)
+
 
     def updateDisplay(self):
         if self.psInactive.isChecked():
@@ -333,9 +365,11 @@ class SettingsSection(QGroupBox):
         '''If values were changed, updates the feed's seetings'''
         active, updateFreq = self.active.isChecked(), self.updateFreq.value()
         psInactive, psUpdateFreq = self.psInactive.isChecked(), self.psUpdateFreq.value()
+        imageFolder, sound = self.macroText.toolTip(), self.soundText.toolTip()
         if active != self.feed.active or updateFreq != self.feed.updateFreq\
-        or psInactive != self.feed.psInactive or psUpdateFreq != self.feed.psUpdateFreq:
-            self.feed.updateParams(active, updateFreq, psInactive, psUpdateFreq)
+        or psInactive != self.feed.psInactive or psUpdateFreq != self.feed.psUpdateFreq\
+        or imageFolder != self.feed.imageFile or sound != self.feed.sound:
+            self.feed.updateParams(active, updateFreq, psInactive, psUpdateFreq, imageFile, sound)
 
 class TrayApp(QSystemTrayIcon):
     '''The main tray window'''
@@ -417,6 +451,7 @@ class TrayApp(QSystemTrayIcon):
         with open("data/volume", "r") as f:
             volume = int(f.read())
         return volume
+
 
 app = QApplication([])
 tray = TrayApp()

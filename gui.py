@@ -229,8 +229,13 @@ class SettingsWindow(QMainWindow):
         self.sections = []
 
         widget = QWidget()
-        self.setCentralWidget(widget)
         mainLayout = QVBoxLayout(widget)
+
+        scroll =QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(widget)
+        self.setCentralWidget(scroll)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         # Add a section by feed
         for feed in self.tray.feeds:
@@ -251,6 +256,9 @@ class SettingsWindow(QMainWindow):
         saveButton = QPushButton("Save")
         saveButton.clicked.connect(self.save)
         mainLayout.addWidget(saveButton)
+
+        # Resize window to fit scrollbar
+        self.resize(self.sizeHint().width()*1.05,self.sizeHint().height())
 
     def updateVolume(self):
         self.volume = self.volumeSlider.value()
@@ -368,8 +376,8 @@ class SettingsSection(QGroupBox):
         imageFolder, sound = self.macroText.toolTip(), self.soundText.toolTip()
         if active != self.feed.active or updateFreq != self.feed.updateFreq\
         or psInactive != self.feed.psInactive or psUpdateFreq != self.feed.psUpdateFreq\
-        or imageFolder != self.feed.imageFile or sound != self.feed.sound:
-            self.feed.updateParams(active, updateFreq, psInactive, psUpdateFreq, imageFile, sound)
+        or imageFolder != self.feed.imageFolder or sound != self.feed.sound:
+            self.feed.updateParams(active, updateFreq, psInactive, psUpdateFreq, imageFolder, sound)
 
 class TrayApp(QSystemTrayIcon):
     '''The main tray window'''

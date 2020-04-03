@@ -201,13 +201,13 @@ class RSSFeed(Feed):
             link = getLatestRSS(self.link)
         except:
             print("Couldn't connect to website")
-            pass
-        if link!=self.latestLink:
-            self.latestLink = link
-            self.notifier.push(self.generateNotification())
-            self.save()
-        elif force:
-            self.notifier.push(self.generateNotification())
+        else:
+            if link!=self.latestLink:
+                self.latestLink = link
+                self.notifier.push(self.generateNotification())
+                self.save()
+            elif force:
+                self.notifier.push(self.generateNotification())
 
 
 class WebsiteFeed(Feed):
@@ -224,13 +224,13 @@ class WebsiteFeed(Feed):
             link = getLatestLink(self.link, self.xpath)
         except:
             print("Couldn't connect to website")
-            pass
-        if link!=self.latestLink:
-            self.latestLink = link
-            self.notifier.push(self.generateNotification())
-            self.save()
-        elif force:
-            self.notifier.push(self.generateNotification())
+        else:
+            if link!=self.latestLink:
+                self.latestLink = link
+                self.notifier.push(self.generateNotification())
+                self.save()
+            elif force:
+                self.notifier.push(self.generateNotification())
 
 class SettingsWindow(QMainWindow):
     '''A window containing the settings for each feed, as well as global settings'''

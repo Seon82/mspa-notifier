@@ -8,6 +8,11 @@ import os
 from random import choice as randchoice
 from core import *
 
+
+class QDoubleSpinBox(QDoubleSpinBox):
+    def wheelEvent(self, event):
+        pass
+
 class Notifier():
     ''' Manages the active notification and the notification queue.
     - volume is a float between 0 and 1 that manages the notification volume.'''
@@ -81,12 +86,13 @@ class Notification(QMainWindow):
         y_pos = screen.height() - y
         self.move(x_pos, y_pos)
 
-    def mousePressEvent(self, QMouseEvent):
-        if QMouseEvent.button() == Qt.LeftButton:
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
             self.close()
             webbrowser.open_new_tab(self.link)
-        elif QMouseEvent.button() == Qt.RightButton:
+        elif event.button() == Qt.RightButton:
             self.close()
+
 
     def display(self, volume = 1):
         '''Show the notification window and plays the sound.'''
@@ -147,8 +153,15 @@ class Feed():
 
     def generateNotification(self):
         '''Returns a notification made with a random image'''
-        imageFile = randchoice(os.listdir(self.imageFolder))
-        imagePath = os.path.join(self.imageFolder, imageFile)
+        try:
+            imageExtensions = [".bmp", ".jpg", ".png", ".pbm", ".gif", ".ppm", ".xbm", ".xpm", "jpeg"]
+            images = [file for file in os.listdir(self.imageFolder) if file[-4:] in imageExtensions]
+            imageFile = randchoice(images)
+            imagePath = os.path.join(self.imageFolder, imageFile)
+        except:
+            print("Image file not found, defaulting to fallback.")
+            imagePath = "media/system/fallback.png"
+
         return Notification(self.name, self.notifier, imagePath, self.latestLink, self.sound)
 
     def updateParams(self, active, updateFreq, psInactive, psUpdateFreq, imageFolder, sound):
@@ -186,15 +199,16 @@ class RSSFeed(Feed):
         force = True pushes a notification to the notifier even if there was no update'''
         try:
             link = getLatestRSS(self.link)
-            if link!=self.latestLink:
-                self.latestLink = link
-                self.notifier.push(self.generateNotification())
-                self.save()
-            elif force:
-                self.notifier.push(self.generateNotification())
         except:
             print("Couldn't connect to website")
             pass
+        if link!=self.latestLink:
+            self.latestLink = link
+            self.notifier.push(self.generateNotification())
+            self.save()
+        elif force:
+            self.notifier.push(self.generateNotification())
+
 
 class WebsiteFeed(Feed):
     '''Inherits the Feed generic class. Use to monitor a link with a fixed xpath from any website'''
@@ -208,15 +222,15 @@ class WebsiteFeed(Feed):
         force = True pushes a notification to the notifier even if there was no update'''
         try:
             link = getLatestLink(self.link, self.xpath)
-            if link!=self.latestLink:
-                self.latestLink = link
-                self.notifier.push(self.generateNotification())
-                self.save()
-            elif force:
-                self.notifier.push(self.generateNotification())
         except:
             print("Couldn't connect to website")
             pass
+        if link!=self.latestLink:
+            self.latestLink = link
+            self.notifier.push(self.generateNotification())
+            self.save()
+        elif force:
+            self.notifier.push(self.generateNotification())
 
 class SettingsWindow(QMainWindow):
     '''A window containing the settings for each feed, as well as global settings'''
@@ -225,7 +239,7 @@ class SettingsWindow(QMainWindow):
         self.tray = tray
         self.volume = self.tray.notifier.volume * 100
         self.setWindowTitle("Settings")
-        self.setWindowIcon(QIcon('media/icons/settings.png'))
+        self.setWindowIcon(QIcon('media/system/settings.png'))
         self.sections = []
 
         widget = QWidget()
@@ -258,7 +272,7 @@ class SettingsWindow(QMainWindow):
         mainLayout.addWidget(saveButton)
 
         # Resize window to fit scrollbar
-        self.resize(self.sizeHint().width()*1.05,self.sizeHint().height())
+        self.resize(self.sizeHint().width()*1.05,self.sizeHint().height()*1.7)
 
     def updateVolume(self):
         self.volume = self.volumeSlider.value()
@@ -350,8 +364,8 @@ class SettingsSection(QGroupBox):
         dialog = QFileDialog()
         name, _ = dialog.getOpenFileName(caption = "Choose notification sound", directory = "media", filter = "Sound files (*.wav)")
         if name!='':
-            self.macroText.setText("..."+os.path.abspath(name)[-15:])
-            self.macroText.setToolTip(name)
+            self.soundText.setText("..."+os.path.abspath(name)[-15:])
+            self.soundText.setToolTip(name)
 
 
     def updateDisplay(self):
@@ -374,6 +388,7 @@ class SettingsSection(QGroupBox):
         active, updateFreq = self.active.isChecked(), self.updateFreq.value()
         psInactive, psUpdateFreq = self.psInactive.isChecked(), self.psUpdateFreq.value()
         imageFolder, sound = self.macroText.toolTip(), self.soundText.toolTip()
+        imageFolder, sound = os.path.relpath(imageFolder), os.path.relpath(sound)
         if active != self.feed.active or updateFreq != self.feed.updateFreq\
         or psInactive != self.feed.psInactive or psUpdateFreq != self.feed.psUpdateFreq\
         or imageFolder != self.feed.imageFolder or sound != self.feed.sound:
@@ -390,7 +405,7 @@ class TrayApp(QSystemTrayIcon):
         self.settingsWindow = SettingsWindow(self)
 
         # Create the icon
-        icon = QIcon("media/icons/icon.png")
+        icon = QIcon("media/system/icon.png")
         self.setIcon(icon)
         self.setVisible(True)
 
@@ -462,5 +477,6 @@ class TrayApp(QSystemTrayIcon):
 
 
 app = QApplication([])
+app.setQuitOnLastWindowClosed(False)
 tray = TrayApp()
 app.exec_()

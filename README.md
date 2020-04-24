@@ -15,6 +15,6 @@ A directory opens, just put a shortcut to the gui.py file inside.
 
 ## Known bugs
 * All unopened notifications will be lost after shutdown.
-* Will display info for the battery-saving mode even on desktop computers.
+* Will display info for the battery-saving mode in settings even on desktop computers.
 
 Feel free to report any bug you find by opening an issue!
